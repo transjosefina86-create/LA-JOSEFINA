@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>La Josefina - Sistema Sincronizado</title>
+    <style>
+        :root { 
+            --green: #1d6f42; --light: #f8faf9; --card: #ffffff; 
+        }
+        body { 
+            font-family: 'Segoe UI', sans-serif; margin: 0; padding: 10px; 
+            background-color: #e5e7eb; background-size: cover;
+            background-position: center; background-attachment: fixed;
+        }
+        /* Pantalla de Login Blanca */
+        #login-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #f3f4f6; display: flex; align-items: center; justify-content: center; z-index: 1000;
+        }
+        .login-card { background: white; padding: 40px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; }
+        
+        .main-layout { display: grid; grid-template-columns: 1fr 380px; gap: 20px; max-width: 1300px; margin: auto; }
+        @media (max-width: 850px) { .main-layout { grid-template-columns: 1fr; } }
+
+        .card, .sidebar, .ficha { 
+            background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(5px);
+            border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); padding: 20px; margin-bottom: 20px;
+        }
+        .card { border-top: 6px solid var(--green); }
+        h2, h3 { color: var(--green); margin-top: 0; }
+
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .field { display: flex; flex-direction: column; }
+        label { font-size: 12px; font-weight: bold; color: #4b5563; margin-bottom: 4px; }
+        input, select, textarea { padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; background: white; }
+        input:focus { border-color: var(--green); outline: none; box-shadow: 0 0 0 2px rgba(29, 111, 66, 0.1); }
+
+        .btn-main { background: var(--green); color: white; border: none; padding: 14px; border-radius: 6px; cursor: pointer; width: 100%; font-weight: bold; font-size: 15px; margin-top: 10px; }
+        
+        .ficha { border-left: 6px solid var(--green); position: relative; }
+        .ficha pre { margin: 0; font-family: inherit; font-size: 14px; font-weight: 600; color: #111827; }
+        
+        .actions { position: absolute; top: 10px; right: 10px; display: flex; gap: 5px; }
+        .btn-action { padding: 5px 10px; border-radius: 4px; border: 1px solid #ddd; background: white; cursor: pointer; font-size: 11px; }
+
+        #lista-envio { width: 100%; height: 300px; font-weight: 600; border-color: #d1d5db; }
+        .hidden { display: none !important; }
+        .search-box { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #d1d5db; margin-bottom: 15px; }
+    </style>
+</head>
+<body>
+
+<div id="login-screen">
+    <div class="login-card">
+        <h1 style="color:var(--green)">La Josefina</h1>
+        <p>Sistema de Logística</p>
+        <input type="password" id="pass-input" placeholder="Contraseña" style="width:100%; margin-bottom:15px;">
+        <button class="btn-main" onclick="verificarAcceso()">Entrar</button>
+    </div>
+</div>
+
+<div id="app-content" class="hidden">
+    <div class="main-layout">
+        <div class="content">
+            <div class="card">
+                <h2>🚚 Carga de Datos</h2>
+                <div class="form-grid">
+                    <div class="field"><label>Intermediario</label>
+                        <select id="inter" class="nav-input" onchange="actualizarCuit()">
+                            <option value="">SIN INTERMEDIARIO</option>
+                            <option value="agroservicios jr y mr sas" data-cuit="30-71897189-2">agroservicios jr y mr sas</option>
+                            <option value="rosales gabriel" data-cuit="20-32081351-5">rosales gabriel</option>
+                        </select>
+                    </div>
+                    <div class="field"><label>CUIT Inter</label><input type="text" id="cuit_inter" class="nav-input" readonly></div>
+                    <div class="field"><label>Transporte</label><input type="text" id="trans" class="nav-input"></div>
+                    <div class="field"><label>CUIT Trans</label><input type="text" id="cuit_trans" class="nav-input"></div>
+                    <div class="field"><label>Chofer</label><input type="text" id="chofer" class="nav-input"></div>
+                    <div class="field"><label>CUIT Chofer</label><input type="text" id="cuit_chofer" class="nav-input"></div>
+                    <div class="field"><label>Chasis</label><input type="text" id="chasis" class="nav-input" oninput="this.value=this.value.toUpperCase()"></div>
+                    <div class="field"><label>Acoplado</label><input type="text" id="acop" class="nav-input" oninput="this.value=this.value.toUpperCase()"></div>
+                </div>
+                <button class="btn-main" onclick="guardarFicha()">Guardar en la Nube</button>
+                
+                <div style="margin-top:20px; border-top:1px solid #eee; padding-top:15px;">
+                    <label>📥 Importar Masivo (Pegar texto)</label>
+                    <textarea id="import-area" style="width:100%; height:60px; margin-top:5px;"></textarea>
+                    <button class="btn-main" style="background:#3b82f6" onclick="procesarImportacion()">Procesar Texto</button>
+                </div>
+            </div>
+
+            <input type="text" id="buscador" class="search-box" onkeyup="filtrar()" placeholder="🔍 Buscar camión o chofer...">
+            <div id="hojaSalida"></div>
+        </div>
+
+        <div class="sidebar">
+            <h3>📋 Lista de Envío</h3>
+            <textarea id="lista-envio"></textarea>
+            <button class="btn-main" style="background:#25d366" onclick="enviarWhatsApp()">🟢 Enviar a WhatsApp</button>
+            <button class="btn-main" style="background:#3b82f6" onclick="copiarTodo()">📋 Copiar Todo</button>
+            <button class="btn-main" style="background:#ef4444; font-size:12px;" onclick="vaciarLista()">Vaciar Lista</button>
+            
+            <div style="margin-top:30px; border-top:1px solid #ddd; padding-top:10px;">
+                <label>🖼️ Cambiar Imagen de Fondo:</label>
+                <input type="file" accept="image/*" onchange="cambiarFondo(event)" style="font-size:11px; margin-top:5px;">
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCIPgaovi3aUlbAEPxalueEXx6Ar5UsiW4w",
+      authDomain: "la-josefina-datos.firebaseapp.com",
+      projectId: "la-josefina-datos",
+      storageBucket: "la-josefina-datos.firebaseestorage.app",
+      messagingSenderId: "392123046964",
+      appId: "1:392123046964:web:b62ddacd25a492b98e7e61"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const camionesRef = collection(db, "camiones");
+
+    window.verificarAcceso = () => {
+        if(document.getElementById('pass-input').value === "1234") {
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('app-content').classList.remove('hidden');
+            configurarTeclado();
+            cargarCamiones();
+            intentarRecuperarDatosAntiguos();
+        } else { alert("Clave incorrecta"); }
+    };
+
+    // RECUPERAR DATOS QUE TENÍAS ANTES (Local Storage)
+    async function intentarRecuperarDatosAntiguos() {
+        const antiguos = JSON.parse(localStorage.getItem('datos_agro_v3'));
+        if(antiguos && antiguos.length > 0) {
+            if(confirm("He encontrado datos antiguos en este equipo. ¿Quieres subirlos a la nube para que se vean en el celular?")) {
+                for(let d of antiguos) {
+                    d.fecha = new Date();
+                    await addDoc(camionesRef, d);
+                }
+                localStorage.removeItem('datos_agro_v3');
+                alert("Datos sincronizados!");
+            }
+        }
+    }
+
+    function configurarTeclado() {
+        const inputs = document.querySelectorAll('.nav-input');
+        inputs.forEach((input, index) => {
+            input.addEventListener('keydown', (e) => {
+                if (e.key === "Enter") {
+                    e.preventDefault();
+                    if (input.id === "acop") guardarFicha();
+                    else inputs[index + 1]?.focus();
+                }
+                if (e.key === "ArrowRight") inputs[index + 1]?.focus();
+                if (e.key === "ArrowLeft") inputs[index - 1]?.focus();
+            });
+        });
+    }
+
+    window.actualizarCuit = () => {
+        const sel = document.getElementById('inter');
+        document.getElementById('cuit_inter').value = sel.options[sel.selectedIndex].getAttribute('data-cuit') || "";
+    };
+
+    window.guardarFicha = async () => {
+        const d = {
+            inter: document.getElementById('inter').value,
+            cuit_inter: document.getElementById('cuit_inter').value,
+            trans: document.getElementById('trans').value,
+            cuit_trans: document.getElementById('cuit_trans').value,
+            chofer: document.getElementById('chofer').value,
+            cuit_chofer: document.getElementById('cuit_chofer').value,
+            chasis: document.getElementById('chasis').value,
+            acop: document.getElementById('acop').value,
+            fecha: new Date()
+        };
+        if(!d.trans || !d.chofer) return alert("Faltan datos");
+        await addDoc(camionesRef, d);
+        ['trans','cuit_trans','chofer','cuit_chofer','chasis','acop'].forEach(id => document.getElementById(id).value = "");
+        document.getElementById('trans').focus();
+    };
+
+    function cargarCamiones() {
+        const q = query(camionesRef, orderBy("fecha", "desc"));
+        onSnapshot(q, (snapshot) => {
+            const contenedor = document.getElementById('hojaSalida');
+            contenedor.innerHTML = "";
+            snapshot.forEach((docSnap) => {
+                const d = docSnap.data();
+                const id = docSnap.id;
+                const div = document.createElement('div');
+                div.className = "ficha";
+                const texto = `${d.inter ? 'intermediario '+d.inter+'\ncuit '+d.cuit_inter+'\n' : ''}transporte ${d.trans}\ncuit ${d.cuit_trans}\nchofer ${d.chofer}\ncuit ${d.cuit_chofer}\nchasis ${d.chasis}\nacop ${d.acop}`;
+                div.innerHTML = `
+                    <div class="actions">
+                        <button class="btn-action" style="color:var(--green)" onclick="anadirALista(\`${texto.replace(/\n/g, '\\n')}\`)"><b>+</b></button>
+                        <button class="btn-action" style="color:red" onclick="eliminarFicha('${id}')">Eliminar</button>
+                    </div>
+                    <pre>${texto}</pre>`;
+                contenedor.appendChild(div);
+            });
+        });
+    }
+
+    window.eliminarFicha = async (id) => { if(confirm("¿Borrar de la nube?")) await deleteDoc(doc(db, "camiones", id)); };
+
+    window.anadirALista = (texto) => {
+        const area = document.getElementById('lista-envio');
+        const sep = area.value === "" ? "" : "\n\n----------\n\n";
+        area.value += sep + texto.replace(/\\n/g, '\n');
+    };
+
+    window.cambiarFondo = (e) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            document.body.style.backgroundImage = `url('${ev.target.result}')`;
+            localStorage.setItem('fondo_custom', ev.target.result);
+        };
+        reader.readAsDataURL(e.target.files[0]);
+    };
+
+    // Recuperar fondo al cargar
+    if(localStorage.getItem('fondo_custom')) {
+        document.body.style.backgroundImage = `url('${localStorage.getItem('fondo_custom')}')`;
+    }
+
+    window.enviarWhatsApp = () => {
+        window.open(`https://wa.me/?text=${encodeURIComponent(document.getElementById('lista-envio').value)}`, '_blank');
+    };
+
+    window.copiarTodo = () => {
+        navigator.clipboard.writeText(document.getElementById('lista-envio').value);
+        alert("Copiado!");
+    };
+
+    window.vaciarLista = () => { document.getElementById('lista-envio').value = ""; };
+
+    window.filtrar = () => {
+        const b = document.getElementById('buscador').value.toLowerCase();
+        document.querySelectorAll('.ficha').forEach(f => f.style.display = f.innerText.toLowerCase().includes(b) ? "" : "none");
+    };
+
+    window.procesarImportacion = async () => {
+        const bloques = document.getElementById('import-area').value.trim().split(/----------/);
+        for(let b of bloques) {
+            if(b.length < 10) continue;
+            const buscar = (tag) => (b.match(new RegExp(tag + "\\s+([^\\n]+)", "i")) || ["",""])[1].trim();
+            await addDoc(camionesRef, {
+                inter: buscar("intermediario"), cuit_inter: buscar("cuit intermediario"),
+                trans: buscar("transporte"), cuit_trans: buscar("cuit transporte"),
+                chofer: buscar("chofer"), cuit_chofer: buscar("cuit chofer"),
+                chasis: buscar("chasis").toUpperCase(), acop: buscar("acop").toUpperCase(),
+                fecha: new Date()
+            });
+        }
+        document.getElementById('import-area').value = "";
+    };
+</script>
+</body>
+</html>
